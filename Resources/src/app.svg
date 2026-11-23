@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+<defs>
+<linearGradient id="tile" x2=".85" y2="1"><stop stop-color="#326d80"/><stop offset=".58" stop-color="#194458"/><stop offset="1" stop-color="#0d2a3b"/></linearGradient>
+<linearGradient id="glass"><stop stop-color="#74abb6"/><stop offset=".23" stop-color="#defff2"/><stop offset=".48" stop-color="#a4d5d4"/><stop offset="1" stop-color="#518a9e"/></linearGradient>
+<linearGradient id="liquid" x2=".25" y2="1"><stop stop-color="#ffda86"/><stop offset="1" stop-color="#e98c50"/></linearGradient>
+<path id="b" d="M64 16 C63 16 63 20 61 23 C59 26 56 29 56 35 C56 41 61.5 46 61.5 50 C61.5 54 57 56 53 60 Q50 63 50 68 V98 Q50 103 55 103 H73 Q78 103 78 98 V68 Q78 63 75 60 C71 56 66.5 54 66.5 50 C66.5 46 72 41 72 35 C72 29 68 26 66 22 C65 20 65 16 64 16 Z"/>
+</defs>
+<rect x="8" y="10" width="112" height="111" rx="25" fill="#0c2435" opacity=".22"/>
+<rect x="8" y="7" width="112" height="112" rx="25" fill="url(#tile)"/>
+<g transform="rotate(17 64 64)">
+<use href="#b" transform="translate(2 3)" fill="#122f40" opacity=".65"/>
+<use href="#b" fill="url(#glass)" stroke="#def5ed" stroke-width="1.7"/>
+<path d="M52 73 Q58 70 65 72 T76 71 V97 Q76 101 72 101 H56 Q52 101 52 97Z" fill="url(#liquid)"/>
+<path d="M61 50 Q64 51 67 50" stroke="#bd7144" stroke-width="1.8"/>
+<path d="M54.5 68 V94" stroke="#fff7d2" stroke-width="2" stroke-linecap="round" opacity=".8"/>
+</g></svg>
