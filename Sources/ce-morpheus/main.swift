@@ -6,16 +6,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let menu = NSMenu()
     private let stateItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let toggleItem = NSMenuItem(title: "", action: #selector(toggle), keyEquivalent: "")
+    private let removeItem = NSMenuItem(title: "許可設定を削除…", action: #selector(removeSetup), keyEquivalent: "")
     private var state: SleepState = .unknown
     private var timer: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         stateItem.isEnabled = false
         toggleItem.target = self
+        removeItem.target = self
         menu.autoenablesItems = false
         menu.addItem(stateItem)
         menu.addItem(toggleItem)
         menu.addItem(.separator())
+        menu.addItem(removeItem)
         menu.addItem(NSMenuItem(title: "終了", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         menu.delegate = self
         statusItem.menu = menu
@@ -63,27 +66,80 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusItem.length = image == nil ? NSStatusItem.variableLength : NSStatusItem.squareLength
         statusItem.button?.setAccessibilityLabel(description)
         statusItem.button?.toolTip = description
+        removeItem.isHidden = !Setup.isInstalled
     }
 
     @objc private func toggle() {
-        let result = SleepControl.set(state != .on)
-        refresh()
-        if let result, result.status == 0 { return }
-        showSetupAlert(detail: result?.stderr ?? "sudo を起動できませんでした。")
+        defer { refresh() }
+        let disable = state != .on
+        let first = SleepControl.set(disable)
+        if first?.status == 0 { return }
+        let reason = first?.stderr.trimmingCharacters(in: .whitespacesAndNewlines) ?? "sudo を起動できませんでした。"
+
+        // 設定済みなら作り直しても直らないので、理由だけを示す。
+        if Setup.isInstalled {
+            showAlert("切り替えに失敗しました", reason)
+            return
+        }
+        guard confirm(
+            "初回の設定が必要です",
+            """
+            管理者のパスワードを 1 回入力すると、このアプリがスリープ設定を切り替えられるようになります。
+
+            許可する内容: ユーザー「\(NSUserName())」（UID \(getuid())）に、/usr/bin/pmset -a disablesleep 0 と 1 の 2 コマンドだけをパスワードなしで許可します。設定ファイルは \(Setup.rulePath) です。
+
+            切り替えに失敗した理由: \(reason)
+            """,
+            button: "設定する"
+        ) else { return }
+        switch Setup.install() {
+        case .cancelled: return
+        case .failed(let detail):
+            showAlert("許可設定の作成に失敗しました", detail)
+            return
+        case .succeeded: break
+        }
+        let retry = SleepControl.set(disable)
+        if retry?.status != 0 {
+            showAlert("許可設定は作成しましたが、切り替えに失敗しました", retry?.stderr ?? "sudo を起動できませんでした。")
+        }
     }
 
-    private func showSetupAlert(detail: String) {
+    @objc private func removeSetup() {
+        defer { refresh() }
+        guard confirm(
+            "許可設定を削除しますか？",
+            """
+            \(Setup.rulePath) を削除します。管理者のパスワードが必要です。
+
+            現在の ON/OFF は変わりません。ON のまま削除すると、OFF に戻すときにもう一度設定が必要になります。
+            """,
+            button: "削除する"
+        ) else { return }
+        if case .failed(let detail) = Setup.remove() {
+            showAlert("許可設定の削除に失敗しました", detail)
+        }
+    }
+
+    private func confirm(_ title: String, _ text: String, button: String) -> Bool {
+        let alert = makeAlert(title, text)
+        alert.addButton(withTitle: button)
+        alert.addButton(withTitle: "キャンセル")
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
+    private func showAlert(_ title: String, _ text: String) {
+        _ = makeAlert(title, text).runModal()
+    }
+
+    private func makeAlert(_ title: String, _ text: String) -> NSAlert {
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = "切り替えに失敗しました（設定が必要です）"
-        alert.informativeText = """
-            sudoers の設定が必要な可能性があります。README の「sudoers の設定」の手順を確認してください。
-
-            \(detail.trimmingCharacters(in: .whitespacesAndNewlines))
-            """
+        alert.messageText = title
+        alert.informativeText = text.trimmingCharacters(in: .whitespacesAndNewlines)
         // メニューバー常駐アプリは前面にいないため、アラートが他のウインドウの裏に隠れないようにする。
         NSApp.activate()
-        alert.runModal()
+        return alert
     }
 }
 

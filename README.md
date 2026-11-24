@@ -15,31 +15,34 @@ open build/ce-morpheus.app
 
 必要なもの: Xcode（Swift 6）、macOS 14 以上。
 
-## sudoers の設定（初回だけ）
+## 初回の設定（アプリ内で 1 回だけ）
 
-`pmset -a disablesleep` は root が要る。アプリは `sudo -n`（パスワードを聞かない）で実行するので、この 2 コマンドだけをパスワードなしで許可する。
+`pmset -a disablesleep` は root が要る。アプリは切り替えのたびに `sudo -n`（パスワードを聞かない）で実行する。ターミナルでの作業は要らない。
 
-1. ユーザー名を確認する: `whoami`
-2. `sudo visudo -f /etc/sudoers.d/ce-morpheus` で次の 1 行を書く（`<ユーザー名>` を 1 の値に置き換える）。
+1. パスワードなしの切り替えに失敗し、自分の設定ファイルがまだ無い場合、「初回の設定が必要です」という確認が出る（失敗の理由も添えられる）。「設定する」を押す。
+2. 管理者の認証ダイアログが出るので、パスワードを 1 回入力する。認証は Touch ID ではなくパスワード入力になる見込み（macOS 27 では未確認）。
+3. アプリが次のファイルを作り、切り替えを 1 回やり直す。やり直しが成功すれば、以降はダイアログなしで切り替わる。
 
-   ```
-   <ユーザー名> ALL=(root) NOPASSWD: /usr/bin/pmset -a disablesleep 0, /usr/bin/pmset -a disablesleep 1
-   ```
+- ファイル: `/private/etc/sudoers.d/ce-morpheus-<UID>`（`<UID>` は自分の数値ユーザー ID。`id -u` で分かる。`root:wheel`、`0440`。`visudo -cf` で構文を確かめてから置く）
+- 中身（許可の主体は数値 UID で書く。名前だと `ALL` などと解釈され得るため）:
 
-3. 構文を確認する。断片だけでなく sudoers 全体も検査し、断片が読み込まれていることを確かめる。
-   - `sudo visudo -cf /etc/sudoers.d/ce-morpheus`（`parsed OK` が出ればよい）
-   - `sudo visudo -c`（すべて `parsed OK` で、その中に `sudoers.d/ce-morpheus` を含む行があればよい。無ければ `/etc/sudoers` が `sudoers.d` を読み込んでいない）
-4. パスワードなしで通るか確認する。今の値を変えないよう、同じ値を指定する。
-   1. `pmset -g; echo "exit=$?"` を実行する（`grep` にはつながない。つなぐと、読み取りの失敗と行が無い場合の区別がつかなくなる）。最後の行が `exit=0` でなければ、ここで中止する。
-   2. 1 の出力から `SleepDisabled` の行を探す。値が `1` なら 1、`0` なら 0、行が無ければ 0 とする。それ以外の値なら、ここで中止する。
-   3. `sudo -k -n /usr/bin/pmset -a disablesleep <2 で決めた値>` を実行する。`-k` で直前に入力したパスワードの認証キャッシュを無視させるので、上の構文確認（外側の手順 3）の直後でも、パスワードなしで許可されているときだけ成功する。
-   4. エラーが出ずに終わればよい。`a password is required` が出たら、外側の手順 2〜3 を見直す。
+  ```
+  #<UID> ALL=(root) NOPASSWD: /usr/bin/pmset -a disablesleep 0, /usr/bin/pmset -a disablesleep 1
+  ```
 
-注意: 同じユーザーで動くプロセスなら、どのアプリでもこの 2 コマンドを呼べる。`pmset` 全体を許可しないこと。
+設定ファイルは利用者ごとに分かれる。アプリが作る・消す・表示するのは、自分の UID のファイルだけ。
 
-パスワードなしの実行が拒否された場合（sudoers が未設定など）、アプリでの切り替えは失敗し、「設定が必要」というアラートが出る。
+自分の設定ファイルがすでにあるのに切り替えに失敗した場合は、設定のやり直しは勧めず、失敗の理由をアラートで示す。
 
-## 手作業での ON/OFF と状態確認
+注意: 同じユーザーで動くプロセスなら、どのアプリでもこの 2 コマンドを呼べる。それ以外のコマンドや `pmset` のほかの設定は許可しない。
+
+### 許可設定の削除
+
+メニューの「許可設定を削除…」から消せる（自分の設定ファイルがあるときだけ表示される）。管理者のパスワードを 1 回入力する。削除しても今の ON/OFF は変わらない。ON のまま削除すると、OFF に戻すときにもう一度設定が要る。
+
+アプリが動かないときは、ターミナルで消せる: `sudo rm /private/etc/sudoers.d/ce-morpheus-$(id -u)`
+
+## 手作業での ON/OFF と状態確認（アプリが動かないとき）
 
 ```sh
 sudo pmset -a disablesleep 1     # ON
@@ -54,7 +57,15 @@ pmset -g | grep SleepDisabled    # 1 = ON、0 または行なし = OFF
 
 ## アンインストール
 
-1. `pmset -g | grep SleepDisabled` が 1 なら `sudo pmset -a disablesleep 0` で戻す。
-2. メニューの「終了」でアプリを閉じる。
-3. sudoers の設定を消す: `sudo rm /etc/sudoers.d/ce-morpheus`
+1. ON なら、アプリのメニューで「OFF にする」を選んで戻す。
+2. メニューの「許可設定を削除…」で設定ファイルを消す。
+3. メニューの「終了」でアプリを閉じる。
 4. このフォルダ（`build/` と `.build/` を含む）を削除する。
+
+アプリが動かない場合、1 と 2 は「手作業での ON/OFF」のコマンドと `sudo rm /private/etc/sudoers.d/ce-morpheus-$(id -u)` で代わりにできる。
+
+### 旧版の手順で設定していた場合
+
+以前の README は、ターミナルで `/etc/sudoers.d/ce-morpheus`（UID の付かない名前）を作る手順だった。このファイルが残っていると、その許可で切り替えが成功するため、アプリは新しい設定ファイルを作らない。UID 付きの設定ファイルが無ければ、メニューの「許可設定を削除…」も出ない。アンインストール後も許可が残る。
+
+`ls /etc/sudoers.d/` で `ce-morpheus` という名前のファイルがあれば、中身が自分用の規則であることを確かめてから `sudo rm /etc/sudoers.d/ce-morpheus` で消す。消したあと、UID 付きの設定ファイルが無く、次の切り替えが権限不足で失敗すれば、新しい方式の設定が始まる。
