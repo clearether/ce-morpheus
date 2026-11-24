@@ -35,7 +35,11 @@
 
 `build/ce-morpheus.app` は作業用（`./build.sh` が毎回作り直す）。普段は `/Applications` のアプリを使う。
 
-必要なもの: Xcode（Swift 6）、macOS 14 以上。
+必要なもの: macOS 14 以上と、Swift 6 以上のツールチェーン（Xcode、または Command Line Tools）。Xcode 本体は必須ではない。Command Line Tools は `xcode-select --install` で入る。
+
+- ビルドは `swift build`（SwiftPM）だけで、Xcode のプロジェクトは使わない。
+- Command Line Tools だけでの確認は、Xcode も入っている端末で `DEVELOPER_DIR` を Command Line Tools に向けて `swift build -c release` が通るところまで（リンカが、存在しない検索パスの警告を 2 行出す）。Xcode の無い Mac で `./install.sh` を最後まで通す確認はしていない。
+- どちらも無いと、ビルドで止まる。`/Applications` には何も入らず、インストール済みの旧版はそのまま。
 
 ### アイコンの再生成（必要なときだけ）
 
