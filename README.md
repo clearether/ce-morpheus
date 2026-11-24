@@ -6,14 +6,45 @@
 - 表示はアプリ内のフラグではなく `pmset -g` の `SleepDisabled` を読む（起動時・メニューを開く直前・切り替え直後・60 秒ごと）。
 - アプリの終了時に設定を元に戻さない。終了後も ON のままになる（再起動後に残るかは未確認。「注意」を参照）。
 
-## ビルドと起動
+メニューの項目:
+
+- 状態の表示（選べない）
+- 「ON にする」／「OFF にする」
+- 「許可設定を削除…」（自分の設定ファイルがあるときだけ）
+- 「ログイン時に起動」（有効ならチェックが付く。承認待ちのときは「ログイン時に起動（承認待ち・選ぶと解除）」）
+- 「終了」
+
+## インストールと起動
 
 ```sh
-./build.sh                    # build/ce-morpheus.app を作り、ad-hoc 署名する
-open build/ce-morpheus.app
+./install.sh
 ```
 
+`install.sh` は次の順に動く。更新するときも、同じく `./install.sh` を実行する。
+
+1. `./build.sh` でビルドする。
+2. 新版を `/Applications` の中に作った一時ディレクトリにコピーし、署名を確かめる（一時ディレクトリは終了時に消える）。
+3. 自分のユーザーで動いている ce-morpheus を終了させる。
+4. `/Applications/ce-morpheus.app` を新版で置き換えて、起動する。
+
+次の場合は止まる。
+
+- 署名を確かめられないとき。`/Applications` にインストール済みの旧版はそのまま。
+- `/Applications/ce-morpheus.app` が別のアプリのとき（バンドル ID が `local.ce-morpheus` でない）。何も消さない。
+- `/Applications` に書き込めないとき。特権は使わない。
+
+`build/ce-morpheus.app` は作業用（`./build.sh` が毎回作り直す）。普段は `/Applications` のアプリを使う。
+
 必要なもの: Xcode（Swift 6）、macOS 14 以上。
+
+### アイコンの再生成（必要なときだけ）
+
+`Resources/` の PNG と `AppIcon.icns` は `Resources/src/generate.py` で作る。Python 3 と `rsvg-convert`（Homebrew の `librsvg`）が要る。実行すると `Resources/` の画像を上書きする。
+
+```sh
+python3 Resources/src/generate.py
+./install.sh
+```
 
 ## 初回の設定（アプリ内で 1 回だけ）
 
@@ -42,6 +73,16 @@ open build/ce-morpheus.app
 
 アプリが動かないときは、ターミナルで消せる: `sudo rm /private/etc/sudoers.d/ce-morpheus-$(id -u)`
 
+## ログイン時の起動
+
+メニューの「ログイン時に起動」を選ぶと、ログイン項目に登録される（ServiceManagement の `SMAppService.mainApp`）。チェックが付いていれば有効。もう一度選ぶと解除する。既定は無効で、アプリが勝手に登録することはない。
+
+- 登録は、アプリのバンドル ID と場所に結び付く。必ず `/Applications/ce-morpheus.app` から起動したアプリのメニューで登録する。この端末での実験では、作り直して署名が変わっても、同じ場所なら登録は有効のままだった。
+- 以前に `build/ce-morpheus.app` から登録していた場合、この端末では、`/Applications` から起動したあと、登録の記録の場所が自動で `/Applications/ce-morpheus.app` に変わった（`sfltool dumpbtm` の URL で確認）。違う場所のままなら、`/Applications` のアプリのメニューで一度解除して、登録し直す。同じバンドル ID なので、`build/ce-morpheus.app` を直接起動しないこと（記録の場所が戻る可能性がある。未確認）。
+- 項目名が「ログイン時に起動（承認待ち・選ぶと解除）」のときは、登録はされているが、まだ許可されていない。システム設定の「ログイン項目」で ce-morpheus を許可すると有効になる。登録をやめるときは、その項目を選ぶ。
+- 実際にログイン時に起動するかは、まだ確かめていない。
+- この端末では、解除したあとも、システムのバックグラウンド項目の記録に「無効」の項目が残った（`sfltool dumpbtm` で見える）。
+
 ## 手作業での ON/OFF と状態確認（アプリが動かないとき）
 
 ```sh
@@ -59,10 +100,12 @@ pmset -g | grep SleepDisabled    # 1 = ON、0 または行なし = OFF
 
 1. ON なら、アプリのメニューで「OFF にする」を選んで戻す。
 2. メニューの「許可設定を削除…」で設定ファイルを消す。
-3. メニューの「終了」でアプリを閉じる。
-4. このフォルダ（`build/` と `.build/` を含む）を削除する。
+3. 「ログイン時に起動」にチェックが付いているか、「承認待ち」と出ていれば、選んで解除する。
+4. メニューの「終了」でアプリを閉じる。
+5. `/Applications/ce-morpheus.app` を削除する。
+6. このフォルダ（`build/` と `.build/` を含む）を削除する。
 
-アプリが動かない場合、1 と 2 は「手作業での ON/OFF」のコマンドと `sudo rm /private/etc/sudoers.d/ce-morpheus-$(id -u)` で代わりにできる。
+アプリが動かない場合、1 と 2 は「手作業での ON/OFF」のコマンドと `sudo rm /private/etc/sudoers.d/ce-morpheus-$(id -u)` で代わりにできる。3 は、システム設定の「ログイン項目」から外す。
 
 ### 旧版の手順で設定していた場合
 

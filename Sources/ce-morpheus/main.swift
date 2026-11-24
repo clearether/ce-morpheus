@@ -1,4 +1,5 @@
 import AppKit
+import ServiceManagement
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
@@ -7,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let stateItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let toggleItem = NSMenuItem(title: "", action: #selector(toggle), keyEquivalent: "")
     private let removeItem = NSMenuItem(title: "許可設定を削除…", action: #selector(removeSetup), keyEquivalent: "")
+    private let loginItem = NSMenuItem(title: "ログイン時に起動", action: #selector(toggleLoginItem), keyEquivalent: "")
     private var state: SleepState = .unknown
     private var timer: Timer?
 
@@ -14,11 +16,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         stateItem.isEnabled = false
         toggleItem.target = self
         removeItem.target = self
+        loginItem.target = self
         menu.autoenablesItems = false
         menu.addItem(stateItem)
         menu.addItem(toggleItem)
         menu.addItem(.separator())
         menu.addItem(removeItem)
+        menu.addItem(loginItem)
         menu.addItem(NSMenuItem(title: "終了", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         menu.delegate = self
         statusItem.menu = menu
@@ -67,6 +71,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusItem.button?.setAccessibilityLabel(description)
         statusItem.button?.toolTip = description
         removeItem.isHidden = !Setup.isInstalled
+        let loginStatus = SMAppService.mainApp.status
+        loginItem.state = loginStatus == .enabled ? .on : .off
+        // 承認待ちはチェックが付かないが、選ぶと解除になるので、名前で伝える。
+        loginItem.title = loginStatus == .requiresApproval ? "ログイン時に起動（承認待ち・選ぶと解除）" : "ログイン時に起動"
+    }
+
+    @objc private func toggleLoginItem() {
+        defer { refresh() }
+        let service = SMAppService.mainApp
+        do {
+            switch service.status {
+            case .enabled, .requiresApproval:
+                try service.unregister()
+            default:
+                try service.register()
+                if service.status == .requiresApproval {
+                    showAlert("ログイン項目の許可が必要です", "システム設定の「ログイン項目」で ce-morpheus を許可してください。")
+                }
+            }
+        } catch {
+            showAlert("ログイン時の起動を切り替えられませんでした", error.localizedDescription)
+        }
     }
 
     @objc private func toggle() {
