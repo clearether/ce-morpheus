@@ -39,7 +39,7 @@
 
 ### アイコンの再生成（必要なときだけ）
 
-`Resources/` の PNG と `AppIcon.icns` は `Resources/src/generate.py` で作る。Python 3 と `rsvg-convert`（Homebrew の `librsvg`）が要る。実行すると `Resources/` の画像を上書きする。
+`Resources/` の PNG と `AppIcon.icns` は `Resources/src/generate.py` で作る。Python 3 と `rsvg-convert`（Homebrew の `librsvg`）が要る。`AppIcon.icns` は macOS 標準の `iconutil` で組み立てる。実行すると `Resources/` の画像を上書きする。
 
 ```sh
 python3 Resources/src/generate.py

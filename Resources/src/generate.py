@@ -26,9 +26,6 @@ with TemporaryDirectory() as tmp:
     for base in [16,32,128,256,512]:
         for scale, suffix in [(1,''),(2,'@2x')]:
             render((root/'src/app.svg').read_text(), base*scale, iconset/f'icon_{base}x{base}{suffix}.png')
-    types = ['icp4','ic11','icp5','ic12','ic07','ic13','ic08','ic14','ic09','ic10']
-    blocks = bytearray()
-    for kind, path in zip(types, [iconset/f'icon_{n}x{n}{s}.png' for n in [16,32,128,256,512] for s in ['', '@2x']]):
-        data = path.read_bytes()
-        blocks.extend(kind.encode() + (8+len(data)).to_bytes(4,'big') + data)
-    (root/'AppIcon.icns').write_bytes(b'icns' + (8+len(blocks)).to_bytes(4,'big') + blocks)
+    output = Path(tmp) / 'AppIcon.icns'
+    run(['/usr/bin/iconutil', '-c', 'icns', str(iconset), '-o', str(output)], check=True)
+    (root / 'AppIcon.icns').write_bytes(output.read_bytes())
